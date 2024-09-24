@@ -1,3 +1,5 @@
+// import smithy4s.codegen.Smithy4sCodegenPlugin
+
 ThisBuild / scalaVersion := "3.5.0"
 
 val Http4sVersion = "0.23.27"
@@ -7,6 +9,7 @@ lazy val m = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .crossType(CrossType.Full)
   .in(file("."))
+  // .enablePlugins(Smithy4sCodegenPlugin)
   .settings(
     scalacOptions += "-Xkind-projector",
     resolvers ++= Resolver.sonatypeOssRepos("snapshots"),
@@ -33,5 +36,7 @@ lazy val m = crossProject(JSPlatform, JVMPlatform)
         "org.http4s" %% "http4s-dsl" % Http4sVersion,
         "org.http4s" %% "http4s-circe" % Http4sVersion,
         "org.http4s" %% "http4s-scalatags" % "0.25.2",
+        // "com.disneystreaming.smithy4s" %% "smithy4s-http4s" % smithy4sVersion.value,
+        // "com.disneystreaming.smithy4s" %% "smithy4s-http4s-swagger" % smithy4sVersion.value,
     ),
   )
