@@ -12,6 +12,9 @@ object MarkHand extends IOApp:
     import _root_.scalatags.Text
     import Text.all.*
     import Text.tags2.title
+
+    val pngFeed = BoneAgePngs("/Users/nineclue/lab/boneage")
+
     def root =
         doctype("html")(
             html(
@@ -24,12 +27,27 @@ object MarkHand extends IOApp:
                 ),
                 lang := "ko",
                 body(
-                    h2("MarkHand")
+                    h2("MarkHand"),
+                    div(s"CSV files: ${pngFeed.listedSize}, folder files: ${pngFeed.actualSize}"),
+                    div(pngFeed.populations.keys.toSeq.sorted.map(k => 
+                        div(s"$k : ${pngFeed.completed(k)._1} / ${pngFeed.completed(k)._2}"))),
+                    servePng
                 )))
 
     override def run(as: List[String]): IO[ExitCode] =
         IO.println(s"MARKHAND server running...") *>
         server.use(_ => IO.never).as(ExitCode.Success)
+
+    def servePng = 
+        // pngFeed.serve match
+        pngFeed.partitionalServe match
+            case Some(p) =>
+                div(
+                    div(p),
+                    div(pngFeed.neighbors().map(_.mkString(",")).getOrElse("NONE")),
+                    img(src := s"/img/${p}.png"))
+            case _ =>
+                div("모든 작업이 끝났습니다.")
 
     def server =
         // ln -s /Users/nineclue/lab/radserver/js/target/scala-3.3.3/rs-fastopt/main.js /Users/nineclue/lab/radserver/jvm/src/main/resources/mkhrad-fastopt.js
@@ -44,9 +62,14 @@ object MarkHand extends IOApp:
                     .getOrElseF(NotFound()) // In case the file doesn't exist
             case request@GET -> Root / "assets" / file =>
                 StaticFile.fromResource(file, Some(request)).getOrElseF(NotFound())
+            case request @ GET -> Root / "img" / file =>
+                StaticFile.fromPath(fs2.io.file.Path(s"/Users/nineclue/lab/boneage/boneage-training-dataset/$file"), Some(request))
+                    .getOrElseF(NotFound())
             case request@GET -> Root =>
                 IO.println(s"Got request from ${request.remoteAddr.getOrElse("unknown")}") *>
                 Ok(root)
+            case GET -> Root / "next" =>
+                Ok(servePng)
 
         val corsService = org.http4s.server.middleware.CORS.policy.withAllowOriginAll(simpleRoutes)
         EmberServerBuilder

@@ -1,6 +1,6 @@
 // import smithy4s.codegen.Smithy4sCodegenPlugin
 
-ThisBuild / scalaVersion := "3.5.0"
+ThisBuild / scalaVersion := "3.5.1"
 
 val Http4sVersion = "0.23.27"
 val CirceVersion = "0.14.10"
@@ -36,6 +36,7 @@ lazy val m = crossProject(JSPlatform, JVMPlatform)
         "org.http4s" %% "http4s-dsl" % Http4sVersion,
         "org.http4s" %% "http4s-circe" % Http4sVersion,
         "org.http4s" %% "http4s-scalatags" % "0.25.2",
+        "com.lihaoyi" %% "os-lib" % "0.10.7",
         // "com.disneystreaming.smithy4s" %% "smithy4s-http4s" % smithy4sVersion.value,
         // "com.disneystreaming.smithy4s" %% "smithy4s-http4s-swagger" % smithy4sVersion.value,
     ),

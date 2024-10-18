@@ -1,4 +1,4 @@
-//> using scala 3.5.0
+//> using scala 3.5.1
 //> using dep co.fs2::fs2-core:3.11.0
 //> using dep co.fs2::fs2-io:3.11.0
 
@@ -18,7 +18,7 @@ object PrepareTrainCSV extends IOApp:
 
     val opentrain =
         Files[IO].readUtf8Lines(Path("/Users/nineclue/lab/boneage/train.csv"))
-            .tail.take(30).map: l =>
+            .tail.take(50).map: l =>
                 val ws = l.split(",")
                 TrainCSV(ws(0).toInt, ws(1).toInt, ws(2) == "True")
-            .compile.toList.map(_.groupBy(_.age / 12))
+            .compile.toList.map(_.groupBy(_.age / 12).toSeq.sortBy(_._1))
