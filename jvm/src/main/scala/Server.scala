@@ -15,6 +15,8 @@ object MarkHand extends IOApp:
 
     val pngFeed = BoneAgePngs("/Users/nineclue/lab/boneage")
 
+    private def replaceAfterLoad(targetUrl: String) = modifier(data.hx.get := targetUrl, data.hx.trigger := "load")
+
     def root =
         doctype("html")(
             html(
@@ -23,15 +25,17 @@ object MarkHand extends IOApp:
                     meta(charset := "UTF-8"),
                     meta(name := "viewport", content := "width=device-width, initial-scale=1.0"),
                     link(href := "/assets/markhand.css", rel := "stylesheet"),
+                    script(src := "/assets/htmx.min.js"),
                     script(src := "/assets/markhand.js"),
                 ),
                 lang := "ko",
                 body(
                     h2("MarkHand"),
                     div(s"CSV files: ${pngFeed.listedSize}, folder files: ${pngFeed.actualSize}"),
+                    div(replaceAfterLoad("/echo/안녕여러분"), "HelloEveryone"),
                     div(pngFeed.populations.keys.toSeq.sorted.map(k => 
                         div(s"$k : ${pngFeed.completed(k)._1} / ${pngFeed.completed(k)._2}"))),
-                    servePng
+                    div(replaceAfterLoad("/next"), "PNG image")
                 )))
 
     override def run(as: List[String]): IO[ExitCode] =
@@ -70,6 +74,8 @@ object MarkHand extends IOApp:
                 Ok(root)
             case GET -> Root / "next" =>
                 Ok(servePng)
+            case GET -> Root / "echo" / content =>
+                Ok(content)
 
         val corsService = org.http4s.server.middleware.CORS.policy.withAllowOriginAll(simpleRoutes)
         EmberServerBuilder

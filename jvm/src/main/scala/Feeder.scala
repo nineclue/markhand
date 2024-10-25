@@ -14,6 +14,9 @@ trait Feeder[A, B, C](using Ordering[A]):
     val stored: Seq[C]
     def listed2Actual(listed: B): C
     val partitions: Map[A, Seq[B]]
+    val marks: Marks
+    def getPoints(itemKey: A): Option[Seq[Point]]
+    def setPoint(itemKey: A, i: Int, point: Point): Unit 
 
     protected lazy val served = collection.mutable.Map.empty[A, AB[C]]
     protected lazy val totalServed = AB.empty[C]
@@ -99,6 +102,9 @@ case class BoneAgePngs(path: String) extends Feeder[Int, TrainCSV, Int]:
     def listed2Actual(listed: TrainCSV): Int = listed.id
     // def listed2Actual(listed: TrainCSV): os.Path = trainDir / s"${listed.id}.png"
     // def toPath(i: Int) = trainDir / s"${i}.png"
+    val marks = HandMarks
+    def getPoints(itemKey: Int): Option[Seq[Point]] = ???
+    def setPoint(itemKey: Int, i: Int, point: Point): Unit = ???
 
     val populations = partitions.mapValues(_.length)
     def completed = populations.map: (k, v) =>
