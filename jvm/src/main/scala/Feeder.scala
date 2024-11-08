@@ -7,7 +7,7 @@ case class TrainCSV(id: Int, age: Int, male: Boolean)
   * Feeder
   *  B: 자료 목록 type
   *  A: B를 구분하는 단위 (key)
-  *  C: 실제 저장 type
+  *  C: 실제 저장 type, bone age에서는 png 파일 목록, listed2Actual: B => C
   */
 trait Feeder[A, B, C](using Ordering[A]):
     val items: Seq[B]
@@ -17,6 +17,7 @@ trait Feeder[A, B, C](using Ordering[A]):
     val marks: Marks
     def getPoints(itemKey: A): Option[Seq[Point]]
     def setPoint(itemKey: A, i: Int, point: Point): Unit 
+    def serve: Option[C] 
 
     protected lazy val served = collection.mutable.Map.empty[A, AB[C]]
     protected lazy val totalServed = AB.empty[C]
@@ -43,7 +44,7 @@ trait Feeder[A, B, C](using Ordering[A]):
                 Some(picked)
 
     /* partition 별로 한 partition내의 것들 끝내고 다음 partition으로 */
-    def serve: Option[C] = 
+    def firstServe: Option[C] = 
         var result: Option[C] = Option.empty
         remainingSet.find: k =>
             result = serve(k)
@@ -60,7 +61,14 @@ trait Feeder[A, B, C](using Ordering[A]):
             case Some(k) => k
             case _ => sortedKeys.head
         serve(nextK)
-        
+
+    /* percent 낮은 partition 부터 순서대로 */
+    def proportionalServe: Option[C] = 
+        val proportions = partitions.map: (k, items) =>
+            (k, served.getOrElse(k, AB.empty).length.toDouble / items.length)
+        val minKey = proportions.minBy(_._2)._1
+        serve(minKey)
+
     def backward: Option[C] = 
         index match
             case Some(i) if i == 0 =>
@@ -77,7 +85,8 @@ trait Feeder[A, B, C](using Ordering[A]):
                 index = Some(i+1)
                 Some(totalServed(i))
             case Some(i) =>
-                partitionalServe
+                // partitionalServe
+                serve
             case None => 
                 None        
 
@@ -100,8 +109,8 @@ case class BoneAgePngs(path: String) extends Feeder[Int, TrainCSV, Int]:
     val partitions = items.groupBy(_.age / 12)
     val stored = os.list(trainDir).withFilter(p => p.baseName.head != '.' && p.ext == "png").map(_.baseName.toInt)
     def listed2Actual(listed: TrainCSV): Int = listed.id
-    // def listed2Actual(listed: TrainCSV): os.Path = trainDir / s"${listed.id}.png"
-    // def toPath(i: Int) = trainDir / s"${i}.png"
+    def serve = proportionalServe
+
     val marks = HandMarks
     def getPoints(itemKey: Int): Option[Seq[Point]] = ???
     def setPoint(itemKey: Int, i: Int, point: Point): Unit = ???

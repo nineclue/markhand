@@ -1,6 +1,6 @@
 // import smithy4s.codegen.Smithy4sCodegenPlugin
 
-ThisBuild / scalaVersion := "3.5.1"
+ThisBuild / scalaVersion := "3.5.2"
 
 val Http4sVersion = "0.23.27"
 val CirceVersion = "0.14.10"
@@ -17,7 +17,7 @@ lazy val m = crossProject(JSPlatform, JVMPlatform)
         "io.circe" %%% "circe-core" % CirceVersion,
         "io.circe" %%% "circe-generic" % CirceVersion,
         "io.circe" %%% "circe-parser" % CirceVersion,
-        "com.lihaoyi" %% "scalatags" % "0.13.1",
+        "com.lihaoyi" %%% "scalatags" % "0.13.1",
     ),
   )
   .jsSettings(

@@ -14,7 +14,9 @@ object MarkHand extends IOApp:
     import Text.tags2.title
 
     val pngFeed = BoneAgePngs("/Users/nineclue/lab/boneage")
-
+    private val imgWidth = 800
+    private val eSize = modifier(width := s"${imgWidth}px", height := s"${imgWidth}px")
+    private val anchor = modifier(position := "absolute", top := "0", left := "0")
     private def replaceAfterLoad(targetUrl: String) = modifier(data.hx.get := targetUrl, data.hx.trigger := "load")
 
     def root =
@@ -30,26 +32,71 @@ object MarkHand extends IOApp:
                 ),
                 lang := "ko",
                 body(
-                    h2("MarkHand"),
-                    div(s"CSV files: ${pngFeed.listedSize}, folder files: ${pngFeed.actualSize}"),
-                    div(replaceAfterLoad("/echo/안녕여러분"), "HelloEveryone"),
-                    div(pngFeed.populations.keys.toSeq.sorted.map(k => 
-                        div(s"$k : ${pngFeed.completed(k)._1} / ${pngFeed.completed(k)._2}"))),
-                    div(replaceAfterLoad("/next"), "PNG image")
+                    div(display := "flex", flexDirection := "column",
+                        headDiv,
+                        bodyDiv
+                    ),
+                    script("JS.setupHandler('container', 'svgElm')")
+                    // div(s"CSV files: ${pngFeed.listedSize}, folder files: ${pngFeed.actualSize}"),
+                    // div(replaceAfterLoad("/echo/안녕여러분"), "HelloEveryone"),
+                    // div(pngFeed.populations.keys.toSeq.sorted.map(k => 
+                    //     div(s"$k : ${pngFeed.completed(k)._1} / ${pngFeed.completed(k)._2}"))),
+                    // div(replaceAfterLoad("/next"), "PNG image")
                 )))
+
+    private def headDiv = 
+        div(id := "head", display := "flex",
+            div(id := "title", fontSize := "xxx-large", flex := 3, "MarkHands"),
+            div(id := "totalRatio", flex := 1, "0 / 0"))
+
+    private def bodyDiv = 
+        div(display := "flex", flexDirection := "row",
+            div(display := "flex", flexDirection := "column", width := "200px", border := "1px solid black",
+                partitions,
+                controls),
+            points,
+            picture
+            )
+        
+    private def partitions = 
+        // div(flex := "2", "partition")
+        div(pngFeed.populations.keys.toSeq.sorted.map(k => 
+            div(fontSize := "large", 
+                s"$k : ${pngFeed.completed(k)._1} / ${pngFeed.completed(k)._2}")))
+
+    private def points = 
+        div(width := "200px", border := "1px solid black",
+            display := "flex", flexDirection := "column", 
+            HandMarks.markNames.map(name => div(fontSize := "large", name)))
+
+    private def controls = 
+        div(display := "flex", flex := "1",
+            span("◀︎", fontSize := "xxx-large", onclick := "window.alert('prev!')"),
+            span("▶︎", fontSize := "xxx-large", onclick := "window.alert('next!')"))
+
+    private def picture = 
+        import _root_.scalatags.Text.svgTags.*
+        import _root_.scalatags.Text.svgAttrs.*
+        div(
+            id := "container",
+            position := "relative",
+            eSize,
+            div(id := "imgDiv", 
+                anchor,
+                eSize,
+                border := "1px solid black"), 
+            svg(id := "svgElm", anchor, eSize),
+            data.hx.get := "/next", data.hx.trigger := "load", data.hx.target := "#imgDiv")
 
     override def run(as: List[String]): IO[ExitCode] =
         IO.println(s"MARKHAND server running...") *>
         server.use(_ => IO.never).as(ExitCode.Success)
 
     def servePng = 
-        // pngFeed.serve match
-        pngFeed.partitionalServe match
+        pngFeed.serve match
             case Some(p) =>
-                div(
-                    div(p),
-                    div(pngFeed.neighbors().map(_.mkString(",")).getOrElse("NONE")),
-                    img(src := s"/img/${p}.png"))
+                img(id := "wristImage", width := s"${imgWidth}px", height := s"${imgWidth}px", 
+                    style := "object-fit: contain", src := s"/img/${p}.png")
             case _ =>
                 div("모든 작업이 끝났습니다.")
 
@@ -59,10 +106,10 @@ object MarkHand extends IOApp:
         // mv ~/Downloads/htmx.min-2.js jvm/src/main/resources
         val simpleRoutes: HttpRoutes[IO] = HttpRoutes.of:
             case request @ GET -> Root / "assets" / "markhand.js" =>
-                StaticFile.fromPath(fs2.io.file.Path("js/target/scala-3.5.0/m-fastopt/main.js"), Some(request))
+                StaticFile.fromPath(fs2.io.file.Path("js/target/scala-3.5.2/m-fastopt/main.js"), Some(request))
                     .getOrElseF(NotFound()) // In case the file doesn't exist
-            case request @ GET -> Root / "assets" / "markhand.js.map" =>
-                StaticFile.fromPath(fs2.io.file.Path("js/target/scala-3.5.0/m-fastopt/main.js.map"), Some(request))
+            case request @ GET -> Root / "assets" / "main.js.map" =>
+                StaticFile.fromPath(fs2.io.file.Path("js/target/scala-3.5.2/m-fastopt/main.js.map"), Some(request))
                     .getOrElseF(NotFound()) // In case the file doesn't exist
             case request@GET -> Root / "assets" / file =>
                 StaticFile.fromResource(file, Some(request)).getOrElseF(NotFound())
