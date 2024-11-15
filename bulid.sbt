@@ -2,7 +2,7 @@
 
 ThisBuild / scalaVersion := "3.5.2"
 
-val Http4sVersion = "0.23.27"
+val Http4sVersion = "0.23.29"
 val CirceVersion = "0.14.10"
 
 lazy val m = crossProject(JSPlatform, JVMPlatform)
@@ -15,6 +15,7 @@ lazy val m = crossProject(JSPlatform, JVMPlatform)
     resolvers ++= Resolver.sonatypeOssRepos("snapshots"),
     libraryDependencies ++= Seq(
         "io.circe" %%% "circe-core" % CirceVersion,
+        "io.circe" %%% "circe-literal" % CirceVersion,
         "io.circe" %%% "circe-generic" % CirceVersion,
         "io.circe" %%% "circe-parser" % CirceVersion,
         "com.lihaoyi" %%% "scalatags" % "0.13.1",

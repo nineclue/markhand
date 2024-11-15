@@ -7,6 +7,9 @@ import org.http4s.implicits.*
 import org.http4s.scalatags.*
 import org.http4s.ember.server.*
 import com.comcast.ip4s.*
+import io.circe.*, io.circe.literal.*
+import io.circe.generic.auto.*, io.circe.syntax.*
+import org.http4s.circe.* 
 
 object MarkHand extends IOApp:
     import _root_.scalatags.Text
@@ -65,9 +68,11 @@ object MarkHand extends IOApp:
                 s"$k : ${pngFeed.completed(k)._1} / ${pngFeed.completed(k)._2}")))
 
     private def points = 
-        div(width := "200px", border := "1px solid black",
+        div(id := "pointContainer", width := "200px", border := "1px solid black",
             display := "flex", flexDirection := "column", 
-            HandMarks.markNames.map(name => div(fontSize := "large", name)))
+            HandMarks.markNames.zipWithIndex.map((name,i) =>
+                div(fontSize := "large", name, onclick := s"JS.markDiv($i);")
+            ))
 
     private def controls = 
         div(display := "flex", flex := "1",
@@ -123,6 +128,10 @@ object MarkHand extends IOApp:
                 Ok(servePng)
             case GET -> Root / "echo" / content =>
                 Ok(content)
+            case GET -> Root / "click" / IntVar(pi) / x / y =>
+                val ps = pngFeed.setPoint(pngFeed.getCurrent.get, pi, (x.toDouble, y.toDouble))
+                val j = Shared.IPoints(pi, ps)
+                Ok(j.asJson)
 
         val corsService = org.http4s.server.middleware.CORS.policy.withAllowOriginAll(simpleRoutes)
         EmberServerBuilder

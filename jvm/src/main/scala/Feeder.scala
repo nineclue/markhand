@@ -14,13 +14,16 @@ trait Feeder[A, B, C](using Ordering[A]):
     val stored: Seq[C]
     def listed2Actual(listed: B): C
     val partitions: Map[A, Seq[B]]
-    val marks: Marks
-    def getPoints(itemKey: A): Option[Seq[Point]]
-    def setPoint(itemKey: A, i: Int, point: Point): Unit 
+    // val marks: Marks
+    // def getPoints(itemKey: A): Option[Seq[Point]]
+    // def setPoint(itemKey: A, i: Int, point: Point): Unit 
     def serve: Option[C] 
 
+    // key와 served items의 map
     protected lazy val served = collection.mutable.Map.empty[A, AB[C]]
+    // item들의 serve된 순서대로 
     protected lazy val totalServed = AB.empty[C]
+    // 남아있는 key들
     private lazy val remainingSet = collection.mutable.Set.from(partitions.keys)
     def listedSize: Int = items.length
     def actualSize: Int = stored.length
@@ -99,6 +102,8 @@ trait Feeder[A, B, C](using Ordering[A]):
             case _ => 
                 None
 
+    def getCurrent = index.map(totalServed.apply)
+
 case class BoneAgePngs(path: String) extends Feeder[Int, TrainCSV, Int]:
     private val baseDir = os.Path(path) 
     private val trainDir = baseDir / "boneage-training-dataset"
@@ -111,11 +116,20 @@ case class BoneAgePngs(path: String) extends Feeder[Int, TrainCSV, Int]:
     def listed2Actual(listed: TrainCSV): Int = listed.id
     def serve = proportionalServe
 
-    val marks = HandMarks
-    def getPoints(itemKey: Int): Option[Seq[Point]] = ???
-    def setPoint(itemKey: Int, i: Int, point: Point): Unit = ???
-
     val populations = partitions.mapValues(_.length)
     def completed = populations.map: (k, v) =>
             (k, (served.getOrElse(k, AB.empty).length, v))
         .toMap
+
+    // point 관련 함수들
+    val marks = HandMarks
+    private val pointsMap = scala.collection.mutable.Map.empty[Int, AB[(Double, Double)]]
+    def getPoints(itemKey: Int): Option[Seq[(Double, Double)]] = 
+        pointsMap.get(itemKey).map(_.toSeq.map(((_, _))))
+
+    def setPoint(itemKey: Int, i: Int, point: (Double, Double)): Seq[(Double, Double)] = 
+        println(s"SETTING POINT of ${itemKey}(${i}) to $point")
+        val points = pointsMap.getOrElse(itemKey, AB.fill(marks.markNames.length)((-1.0, -1.0)))
+        points(i) = point
+        pointsMap.update(itemKey, points)
+        points.toSeq
