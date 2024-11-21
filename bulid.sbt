@@ -37,7 +37,7 @@ lazy val m = crossProject(JSPlatform, JVMPlatform)
         "org.http4s" %% "http4s-dsl" % Http4sVersion,
         "org.http4s" %% "http4s-circe" % Http4sVersion,
         "org.http4s" %% "http4s-scalatags" % "0.25.2",
-        "com.lihaoyi" %% "os-lib" % "0.10.7",
+        "com.lihaoyi" %% "os-lib" % "0.11.3",
         // "com.disneystreaming.smithy4s" %% "smithy4s-http4s" % smithy4sVersion.value,
         // "com.disneystreaming.smithy4s" %% "smithy4s-http4s-swagger" % smithy4sVersion.value,
     ),

@@ -39,7 +39,7 @@ object MarkHand extends IOApp:
                         headDiv,
                         bodyDiv
                     ),
-                    script("JS.setupHandler('container', 'svgElm')")
+                    script("JS.setupHandler('container', 'wristImage', 'svgElm')")
                     // div(s"CSV files: ${pngFeed.listedSize}, folder files: ${pngFeed.actualSize}"),
                     // div(replaceAfterLoad("/echo/안녕여러분"), "HelloEveryone"),
                     // div(pngFeed.populations.keys.toSeq.sorted.map(k => 
@@ -77,7 +77,7 @@ object MarkHand extends IOApp:
     private def controls = 
         div(display := "flex", flex := "1",
             span("◀︎", fontSize := "xxx-large", onclick := "window.alert('prev!')"),
-            span("▶︎", fontSize := "xxx-large", onclick := "window.alert('next!')"))
+            span("▶︎", fontSize := "xxx-large", onclick := "JS.forward"))
 
     private def picture = 
         import _root_.scalatags.Text.svgTags.*
@@ -100,8 +100,8 @@ object MarkHand extends IOApp:
     def servePng = 
         pngFeed.serve match
             case Some(p) =>
-                img(id := "wristImage", width := s"${imgWidth}px", height := s"${imgWidth}px", 
-                    style := "object-fit: contain", src := s"/img/${p}.png")
+                img(id := "wristImage", eSize,
+                    style := "object-fit: contain", src := s"/img/${p}.png", onload := "JS.resetImg")
             case _ =>
                 div("모든 작업이 끝났습니다.")
 
@@ -125,15 +125,23 @@ object MarkHand extends IOApp:
                 IO.println(s"Got request from ${request.remoteAddr.getOrElse("unknown")}") *>
                 Ok(root)
             case GET -> Root / "next" =>
+                if pngFeed.getCurrent.nonEmpty then pngFeed.savePoints
                 Ok(servePng)
             case GET -> Root / "echo" / content =>
                 Ok(content)
-            case GET -> Root / "click" / IntVar(pi) / x / y =>
-                val ps = pngFeed.setPoint(pngFeed.getCurrent.get, pi, (x.toDouble, y.toDouble))
-                val j = Shared.IPoints(pi, ps)
-                Ok(j.asJson)
+            case GET -> Root / "click" / IntVar(pi) / IntVar(w) / IntVar(h) / x / y =>
+                pngFeed.getCurrent match
+                    case Some(ikey) =>                        
+                        val ps = pngFeed.setPoint(ikey, pi, (w, h), (x.toDouble, y.toDouble))
+                        val j = Shared.IPoints(pi, ps)
+                        Ok(j.asJson)
+                    case _ =>
+                        println("pngFeed has no current item")
+                        InternalServerError("pngFeed has no current item")
 
         val corsService = org.http4s.server.middleware.CORS.policy.withAllowOriginAll(simpleRoutes)
+
+        pngFeed.loadPoints
         EmberServerBuilder
             .default[IO]
             .withHost(ipv4"0.0.0.0")

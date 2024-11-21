@@ -20,7 +20,7 @@ trait Feeder[A, B, C](using Ordering[A]):
     def serve: Option[C] 
 
     // key와 served items의 map
-    protected lazy val served = collection.mutable.Map.empty[A, AB[C]]
+    protected lazy val served = collection.mutable.Map.empty[A, AB[C]].withDefaultValue(AB.empty[C])
     // item들의 serve된 순서대로 
     protected lazy val totalServed = AB.empty[C]
     // 남아있는 key들
@@ -28,8 +28,8 @@ trait Feeder[A, B, C](using Ordering[A]):
     def listedSize: Int = items.length
     def actualSize: Int = stored.length
 
-    private var index: Option[Int] = None
-    private var lastServed: Option[A] = Option.empty
+    protected var index: Option[Int] = None
+    protected var lastServed: Option[A] = Option.empty
 
     def serve(partition: A): Option[C] = 
         val s = served.getOrElseUpdate(partition, AB.empty)
@@ -44,7 +44,7 @@ trait Feeder[A, B, C](using Ordering[A]):
                 served(partition).append(picked)
                 totalServed.append(picked)
                 index = Some(totalServed.length - 1)
-                Some(picked)
+                Some(picked)        
 
     /* partition 별로 한 partition내의 것들 끝내고 다음 partition으로 */
     def firstServe: Option[C] = 
@@ -123,13 +123,52 @@ case class BoneAgePngs(path: String) extends Feeder[Int, TrainCSV, Int]:
 
     // point 관련 함수들
     val marks = HandMarks
-    private val pointsMap = scala.collection.mutable.Map.empty[Int, AB[(Double, Double)]]
+    private val pointsMap = scala.collection.mutable.Map.empty[Int, (Int, Int, AB[(Double, Double)])]
     def getPoints(itemKey: Int): Option[Seq[(Double, Double)]] = 
-        pointsMap.get(itemKey).map(_.toSeq.map(((_, _))))
+        pointsMap.get(itemKey).map(_._3.toSeq.map(((_, _))))
 
-    def setPoint(itemKey: Int, i: Int, point: (Double, Double)): Seq[(Double, Double)] = 
+    def setPoint(itemKey: Int, i: Int, size: (Int, Int), point: (Double, Double)): Seq[(Double, Double)] = 
         println(s"SETTING POINT of ${itemKey}(${i}) to $point")
-        val points = pointsMap.getOrElse(itemKey, AB.fill(marks.markNames.length)((-1.0, -1.0)))
+        val (_, _, points) = pointsMap.getOrElse(itemKey, (0, 0, AB.fill(marks.markNames.length)((-1.0, -1.0))))
         points(i) = point
-        pointsMap.update(itemKey, points)
+        pointsMap.update(itemKey, (size._1, size._2, points))
         points.toSeq
+
+    private val newline = sys.props("line.separator")
+    private val file = os.pwd / "points.txt"
+    def loadPoints = 
+        if os.exists(file) then
+            println("loading points...")
+            val contents = os.read(file).split(newline)
+            println(contents.head)
+            contents.tail.foreach: l =>
+                val comps = l.split(",").map(_.strip)
+                val (base, ps) = comps.splitAt(3)
+                val bInt = base.map(_.toInt)
+                val pDouble = ps.sliding(2, 2).map(pp => (pp(0).toDouble, pp(1).toDouble))
+                pointsMap += ((bInt(0), (bInt(1), bInt(2), AB.from(pDouble))))
+                push(bInt(0))
+            println(pointsMap)
+            println(s"$lastServed, $totalServed, $index")
+        else
+            println("no points.txt file, skipping loading.")
+
+    def savePoints = 
+        println("save points")
+        val files = totalServed.mkString("[", ",", "]")
+        val subs = 
+            totalServed.map: i =>
+                val (w, h, ps) = pointsMap.getOrElse(i, (0, 0, AB.fill(marks.markNames.length)((-1.0, -1.0))))
+                s"$i,$w,$h,${ps.map(t => s"${t._1},${t._2}").mkString(",")}"
+            .mkString(newline)
+        os.write.over(file, files ++ newline ++ subs)
+
+    def push(fno: Int) = 
+        items.find(_.id == fno) match
+            case Some(t) =>
+                val k = t.age / 12
+                lastServed = Some(k)
+                served(k).append(fno)
+                totalServed.append(fno)
+                index = Some(totalServed.length - 1)
+            case _ => throw Exception(s"파일 번호 ${fno}에 관한 자료를 찾을 수 없습니다.")

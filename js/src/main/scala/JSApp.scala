@@ -5,11 +5,13 @@ import org.scalajs.dom
 import dom.{MouseEvent, Element, Image, HTMLElement, XMLHttpRequest, Event}
 import scala.compiletime.uninitialized
 import io.circe.generic.auto.*, io.circe.syntax.*
+import org.scalajs.dom.SVGElement
+import scala.scalajs.js.Promise
 
 @JSExportTopLevel("JS")
 object JSApp:
 
-    // private val htmx = js.Dynamic.global.htmx
+    private val htmx = js.Dynamic.global.htmx
     private val xhttp = XMLHttpRequest()
     private def setAjaxHandler[A](f: Event => A = (_ => println(xhttp.responseText))) = 
       xhttp.onreadystatechange = e => 
@@ -19,54 +21,65 @@ object JSApp:
     @JSExport
     def hello = println("Hello, from JS")
 
-    private var svgElm: Element = uninitialized
+    private var conElmId: String = uninitialized
+    private var imgElmId: String = uninitialized
+    private var svgElmId: String = uninitialized
     private var currentPointIndex: Int = 0
 
     @JSExport
-    def setupHandler(iElmId: String, sElmId: String) = 
-        val iDiv = dom.document.getElementById(iElmId)
-        svgElm = dom.document.getElementById(sElmId)
+    def setupHandler(containerId: String, iElmId: String, sElmId: String) = 
+        conElmId = containerId
+        imgElmId = iElmId
+        svgElmId = sElmId
+        val conElm = dom.document.getElementById(containerId)
         println(s"Setup handler...")
-        // iDiv.addEventListener("mousemove", e => mouseHandler(iDiv)(e))
-        iDiv.addEventListener("mousedown", e => mouseHandler(iDiv)(e))
+        conElm.addEventListener("mousedown", e => mouseHandler(e))
 
     private val borderPxRx = raw"\s*(\d+)\s*px".r
     private val doubleFormat = "%.4f"
-    private def mouseHandler(iTag: Element)(e: MouseEvent) =
-        // val (x,y) = (iTag.clientLeft, iTag.clientTop)
-        val rect = iTag.getBoundingClientRect()
+    private def imageInformation =
+        val imgElm = dom.document.getElementById(imgElmId).asInstanceOf[Image]
+        val (ow, oh) = (imgElm.naturalWidth, imgElm.naturalHeight)
+        val rect = imgElm.getBoundingClientRect()
+        val iratio = ow.toDouble / oh  // 원 image의 비율
+        val borderWidth = imgElm.style.borderWidth match
+            case borderPxRx(bw) => bw.toInt
+            case _ => 0
+        // actual img area width, height
+        val (iw, ih) = (rect.width - borderWidth * 2, rect.height - borderWidth * 2)
+        // rescaled image size
+        val (width, height) = if iratio >= 1.0 then (iw, ih / iratio) else (iw * iratio, ih)
+        // println(s"($ow, $oh) => ($width, $height)")
+        ((ow, oh), (width, height))
+
+    // 좌표 x, y => 원래 이미지 크기 tup2, ratio tup2 (서버로 보낼 값들)
+    private def p2r(x: Double, y: Double): ((Int, Int), (Double, Double)) = 
+        val ((ow, oh), (iw, ih)) = imageInformation
+        val conElm = dom.document.getElementById(conElmId)
+        val rect = conElm.getBoundingClientRect()
+        val ix = x - rect.left - (rect.width - iw) / 2.0
+        val iy = y - rect.top - (rect.height - ih) / 2.0
+        // println(s"[$x, $y]<${rect.left}, ${rect.top}> => ($ix, $iy) => (${ix / iw}, ${iy / ih})")
+        ((ow, oh), (ix / iw, iy / ih))
+
+    // ratio x, y => x, y padding 값 tup2, 변환 point tup2 (svg 좌표 표시에 필요한 값들)
+    private def r2p(rx: Double, ry: Double): ((Double, Double), (Double, Double)) = 
+        val ((ow, oh), (iw, ih)) = imageInformation
+        val conElm = dom.document.getElementById(conElmId)
+        val rect = conElm.getBoundingClientRect()
+        (((rect.width - iw) / 2.0, (rect.height - ih) / 2.0), (rx * iw, ry * ih))
+
+    private def mouseHandler(e: MouseEvent) =
+        val conElm = dom.document.getElementById(conElmId)
+        val rect = conElm.getBoundingClientRect()
         e.`type` match
             case "mousemove" =>
                 // println(s"(${e.clientX - rect.left} , ${e.clientY - rect.top})")
             case "mousedown" =>
-                // object-fit : contain인 경우 img 태그의 위치는 변하지 않음
-                val img = dom.document.getElementById("wristImage").asInstanceOf[Image]
-                val iratio = img.naturalWidth.toDouble / img.naturalHeight  // 원 image의 비율
-                val borderWidth = iTag.asInstanceOf[HTMLElement].style.borderWidth match
-                    case borderPxRx(bw) => bw.toInt
-                    case _ => 0
-                // actual img tag width, height
-                val (width, height) = (rect.width - borderWidth * 2, rect.height - borderWidth * 2)
-                // rescaled image size
-                val (iw, ih) = if iratio >= 1.0 then (width, height / iratio) else (width * iratio, height)
-                //      div position - img tag position - padding for image
-                val iLeft = e.clientX - rect.left - (width - iw) / 2
-                val iTop = e.clientY - rect.top - (height - ih) / 2
-                val (xratio, yratio) = (iLeft / iw, iTop / ih)
-
-                println(s"Original size : ${img.naturalWidth}, ${img.naturalHeight}")
-                println(s"Image ratio : $iratio | Border width : $borderWidth")
-                println(s"Image tag size : ${rect.width}, ${rect.height}")
-                println(s"Mouse position : ${e.clientX}, ${e.clientY}")
-                println(s"Calculated image position : $iLeft, $iTop")
-                // println(s"Mouse Click! (${iLeft}, ${iTop}) [$iw, $ih] => <$xratio, $yratio>")
-                // println(s"VS. ${(e.clientX - rect.left).toInt}, ${(e.clientY - rect.top).toInt}")
-                // println("calling" ++ s"/click/$currentPointIndex/${String.format(doubleFormat, xratio)}/${String.format(doubleFormat, yratio)}")
+                val ((ow, oh), (rx, ry)) = p2r(e.clientX, e.clientY)
                 setAjaxHandler(clickCB)
-                xhttp.open("GET", s"/click/$currentPointIndex/${String.format(doubleFormat, xratio)}/${String.format(doubleFormat, yratio)}", true)
+                xhttp.open("GET", s"/click/$currentPointIndex/$ow/$oh/${String.format(doubleFormat, rx)}/${String.format(doubleFormat, ry)}", true)
                 xhttp.send()
-                // markPoint((e.clientX - rect.left).toInt, (e.clientY - rect.top).toInt)
-                  // (${e.clientX - rect.left} , ${e.clientY - rect.top}), [${img.naturalWidth}, ${img.naturalHeight}] => {${iw}, ${ih}}")
     
     private def clickCB(e: Event) = 
         import io.circe.parser.*
@@ -77,8 +90,12 @@ object JSApp:
             yield pi
         r match
             case Right(pi) => 
+                // val ((xpad, ypad), (px, py)) = r2p.tupled(pi.ps(pi.pi))
+                // markPoint((px + xpad).toInt, (py + ypad).toInt)
+                // markDiv(pi.pi + 1)
+                // if currentPointIndex == pi.ps.length then ???
+                markAllPoints(pi)
                 markDiv(pi.pi + 1)
-                if currentPointIndex == pi.ps.length then ???
                 println(s"${pi.pi} : ${pi.ps}")
             case _ => 
                 ()
@@ -88,12 +105,19 @@ object JSApp:
         import scalatags.JsDom.svgTags.*
         import scalatags.JsDom.svgAttrs.*
         import scalatags.JsDom.implicits.{intAttr, stringAttr}
-        println("mark!")
         val fillColor = if current then "tomato" else "yellow"
+        val svgElm = dom.document.getElementById(svgElmId).asInstanceOf[SVGElement]
         svgElm.appendChild(
             circle(cx := px, cy := py, r := 3, fill := fillColor, stroke := "white").render
         )
 
+    private def markAllPoints(ip: Shared.IPoints) = 
+        val svgElm = dom.document.getElementById(svgElmId).asInstanceOf[SVGElement]
+        svgElm.innerHTML = ""
+        ip.ps.zipWithIndex.foreach: (p, pi) =>
+            val ((xpad, ypad), (px, py)) = r2p.tupled(p)
+            markPoint((px + xpad).toInt, (py + ypad).toInt, pi == ip.pi)
+        
     @JSExport
     def markDiv(i: Int) =
         val parent = dom.document.getElementById("pointContainer")
@@ -106,3 +130,13 @@ object JSApp:
             s.color = "white"
             s.background = "black"
             currentPointIndex = i
+
+    @JSExport
+    def resetImg = 
+        val svgElm = dom.document.getElementById(svgElmId).asInstanceOf[SVGElement]
+        svgElm.innerHTML = ""
+        markDiv(0)
+
+    @JSExport
+    def forward = 
+        htmx.ajax("GET", "/next", "#imgDiv")
